@@ -34,8 +34,7 @@ COPY nginx.conf /etc/nginx/conf.d/hinsight.conf
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Run as non-root for security
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-USER appuser
+
 
 EXPOSE 8080
 
