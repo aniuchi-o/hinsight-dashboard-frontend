@@ -15,6 +15,10 @@ import AlertsPage from './pages/AlertsPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
 import UnauthorizedPage from './pages/UnauthorizedPage';
+import MFASetupPage from './pages/MFASetupPage';
+import MFAVerifyPage from './pages/MFAVerifyPage';
+import TenantSignupPage from './pages/TenantSignupPage';
+import UserSignupPage from './pages/UserSignupPage';
 import GlossarySection from './components/help/sections/GlossarySection';
 import MetricDefinitionsSection from './components/help/sections/MetricDefinitionsSection';
 import FAQSection from './components/help/sections/FAQSection';
@@ -47,11 +51,15 @@ function AppRoutes() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/mfa/verify" element={<MFAVerifyPage />} />
+        <Route path="/signup/tenant" element={<TenantSignupPage />} />
+        <Route path="/signup/user" element={<UserSignupPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardShell />}>
             <Route path="/" element={<Navigate to={defaultRoute} replace />} />
+            <Route path="/mfa/setup" element={<MFASetupPage />} />
 
             <Route element={<ProtectedRoute requiredPermission="view:overview" />}>
               <Route path="/overview" element={<OverviewPage />} />

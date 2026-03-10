@@ -1,11 +1,39 @@
-// All roles that can exist in the system
-export type UserRole = 'EXECUTIVE' | 'WELLNESS_MANAGER' | 'PROGRAM_MANAGER' | 'ADMIN';
+// Lowercase roles matching backend JWT `role` claim
+export type UserRole = 'admin' | 'executive' | 'wellness_manager' | 'program_manager';
+
+export interface ILoginPayload {
+    email: string;
+    password: string;
+    tenant_slug: string;
+    data_region: 'CA' | 'US';
+    otp?: string;
+}
+
+export interface ILoginResponse {
+    access_token: string;
+    token_type: 'bearer';
+}
+
+/**
+ * JWT claims structure from backend:
+ * sub  → user ID        tid  → tenant ID
+ * reg  → data region    role → user role
+ * iat  → issued at      exp  → expiration
+ */
+export interface IJWTClaims {
+    sub: string;
+    tid: string;
+    reg: 'CA' | 'US';
+    role: UserRole;
+    iat: number;
+    exp: number;
+}
 
 /**
  * RBAC Permissions Map — includes Alerts, Settings, Help.
  */
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
-    EXECUTIVE: [
+    executive: [
         'view:overview',
         'view:lifestyle',
         'view:nutrition_obesity',
@@ -16,7 +44,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
         'action:alerts:view',
         'action:settings:mutate',
     ],
-    WELLNESS_MANAGER: [
+    wellness_manager: [
         'view:overview',
         'view:lifestyle',
         'view:nutrition_obesity',
@@ -29,7 +57,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
         'action:alerts:acknowledge',
         'action:settings:mutate',
     ],
-    PROGRAM_MANAGER: [
+    program_manager: [
         'view:overview',
         'view:lifestyle',
         'view:alerts',
@@ -39,7 +67,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
         'action:alerts:acknowledge',
         'action:settings:mutate',
     ],
-    ADMIN: [
+    admin: [
         '*',
         'action:settings:system',
         'action:alerts:dismiss:all',
@@ -51,6 +79,8 @@ export interface IAuthUser {
     id: string;
     role: UserRole;
     tenantId: string;
+    tenantSlug: string;
+    dataRegion: 'CA' | 'US';
     displayName: string;
     permissions: string[];
     lastLoginAt: string;
