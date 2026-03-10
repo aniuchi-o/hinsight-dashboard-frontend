@@ -1,9 +1,15 @@
 import { IAlertsFeedResponse, IAlertFilters, IAcknowledgeAlertPayload, IAlert } from '../types/alerts.types';
-import apiClient from './apiClient';
+import {
+    getAcknowledgedIds,
+    getDismissedIds,
+    acknowledgeAlertId,
+    acknowledgeAllIds,
+    unacknowledgeAllIds,
+} from '../utils/alertPersistence';
 
-// ── Mock alert data for Phase 1 ───────────────────────────────────────────
+// ── Mock alert data (serves as source until backend delivers alerts) ──────
 
-const MOCK_ALERTS: IAlert[] = [
+const SEED_ALERTS: Readonly<IAlert>[] = [
     {
         id: 'alert-001',
         type: 'THRESHOLD_BREACH',
@@ -54,9 +60,9 @@ const MOCK_ALERTS: IAlert[] = [
         percentageOfWorkforce: null,
         relatedView: 'nutrition_obesity',
         tenantId: 'tenant-ca-001',
-        isAcknowledged: true,
-        acknowledgedByRole: 'WELLNESS_MANAGER',
-        acknowledgedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+        isAcknowledged: false,
+        acknowledgedByRole: null,
+        acknowledgedAt: null,
         isDismissed: false,
         createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         expiresAt: null,
@@ -101,6 +107,20 @@ const MOCK_ALERTS: IAlert[] = [
     },
 ];
 
+// ── Merge persisted state onto seed alerts ─────────────────────────────────
+
+function hydrateAlerts(userId: string): IAlert[] {
+    const ackedIds = getAcknowledgedIds(userId);
+    const dismissedIds = getDismissedIds(userId);
+
+    return SEED_ALERTS.map((a) => ({
+        ...a,
+        isAcknowledged: ackedIds.has(a.id),
+        acknowledgedAt: ackedIds.has(a.id) ? new Date().toISOString() : null,
+        isDismissed: dismissedIds.has(a.id),
+    }));
+}
+
 function applyFilters(alerts: IAlert[], filters: IAlertFilters): IAlert[] {
     return alerts.filter((alert) => {
         if (filters.severity !== 'ALL' && alert.severity !== filters.severity) return false;
@@ -112,13 +132,22 @@ function applyFilters(alerts: IAlert[], filters: IAlertFilters): IAlert[] {
     });
 }
 
+// ── Public API ─────────────────────────────────────────────────────────────
+
+let _currentUserId = '';
+
+export function setAlertsUserId(userId: string): void {
+    _currentUserId = userId;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchAlerts(filters: IAlertFilters, _page = 1): Promise<IAlertsFeedResponse> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const filtered = applyFilters(MOCK_ALERTS, filters);
+    const all = hydrateAlerts(_currentUserId);
+    const filtered = applyFilters(all, filters);
     return {
         alerts: filtered,
         totalCount: filtered.length,
-        unreadCount: MOCK_ALERTS.filter((a) => !a.isAcknowledged && !a.isDismissed).length,
+        unreadCount: all.filter((a) => !a.isAcknowledged && !a.isDismissed).length,
         page: 1,
         pageSize: 20,
         lastRefreshedAt: new Date().toISOString(),
@@ -126,42 +155,14 @@ export async function fetchAlerts(filters: IAlertFilters, _page = 1): Promise<IA
 }
 
 export async function acknowledgeAlert(payload: IAcknowledgeAlertPayload): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const alert = MOCK_ALERTS.find((a) => a.id === payload.alertId);
-    if (alert) {
-        alert.isAcknowledged = true;
-        alert.acknowledgedByRole = 'WELLNESS_MANAGER';
-        alert.acknowledgedAt = new Date().toISOString();
-    }
+    acknowledgeAlertId(_currentUserId, payload.alertId);
 }
 
 export async function acknowledgeAllAlerts(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    MOCK_ALERTS.forEach((a) => {
-        if (!a.isAcknowledged) {
-            a.isAcknowledged = true;
-            a.acknowledgedByRole = 'WELLNESS_MANAGER';
-            a.acknowledgedAt = new Date().toISOString();
-        }
-    });
+    const allIds = SEED_ALERTS.map((a) => a.id);
+    acknowledgeAllIds(_currentUserId, allIds);
 }
 
 export async function unacknowledgeAllAlerts(): Promise<void> {
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    MOCK_ALERTS.forEach((a) => {
-        a.isAcknowledged = false;
-        a.acknowledgedByRole = null;
-        a.acknowledgedAt = null;
-    });
+    unacknowledgeAllIds(_currentUserId);
 }
-
-// ── REST-style service object (for direct page-level usage) ──────────────────
-
-
-export const alertsService = {
-    acknowledgeAll: (tenantId: string) =>
-        apiClient.patch(`/tenants/${tenantId}/alerts/acknowledge-all`, {}),
-    unacknowledgeAll: (tenantId: string) =>
-        apiClient.patch(`/tenants/${tenantId}/alerts/unacknowledge-all`, {}),
-};
-
