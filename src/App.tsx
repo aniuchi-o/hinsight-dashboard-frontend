@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -42,6 +43,18 @@ const VIEW_ROUTE_MAP: Record<string, string> = {
   feelings: '/feelings',
 };
 
+// Listens for 403 events emitted by apiClient and navigates to /unauthorized
+// Must be rendered inside <BrowserRouter> to access useNavigate
+function ForbiddenRedirectHandler() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const handle = () => navigate('/unauthorized', { replace: true });
+    window.addEventListener('auth:forbidden', handle);
+    return () => window.removeEventListener('auth:forbidden', handle);
+  }, [navigate]);
+  return null;
+}
+
 // Inner component so it can consume SettingsContext
 function AppRoutes() {
   const { defaultView } = useSettingsContext();
@@ -49,6 +62,7 @@ function AppRoutes() {
 
   return (
     <BrowserRouter>
+      <ForbiddenRedirectHandler />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/mfa/verify" element={<MFAVerifyPage />} />

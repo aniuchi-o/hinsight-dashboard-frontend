@@ -93,6 +93,11 @@ const createApiClient = (baseURL: string): AxiosInstance => {
                 return Promise.reject(new Error(retryMessage));
             }
 
+            if (status === 500) {
+                console.error('[HINSIGHT] Server error:', error.config?.url);
+                return Promise.reject(new Error('A server error occurred. Please try again later.'));
+            }
+
             return Promise.reject(error);
         }
     );
