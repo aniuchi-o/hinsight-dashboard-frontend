@@ -136,13 +136,17 @@ function applyFilters(alerts: IAlert[], filters: IAlertFilters): IAlert[] {
 
 let _currentUserId = '';
 
+function hasUserScope(): boolean {
+    return _currentUserId.trim().length > 0;
+}
+
 export function setAlertsUserId(userId: string): void {
     _currentUserId = userId;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchAlerts(filters: IAlertFilters, _page = 1): Promise<IAlertsFeedResponse> {
-    const all = hydrateAlerts(_currentUserId);
+    const all = hasUserScope() ? hydrateAlerts(_currentUserId) : [...SEED_ALERTS];
     const filtered = applyFilters(all, filters);
     return {
         alerts: filtered,
@@ -155,14 +159,17 @@ export async function fetchAlerts(filters: IAlertFilters, _page = 1): Promise<IA
 }
 
 export async function acknowledgeAlert(payload: IAcknowledgeAlertPayload): Promise<void> {
+    if (!hasUserScope()) return;
     acknowledgeAlertId(_currentUserId, payload.alertId);
 }
 
 export async function acknowledgeAllAlerts(): Promise<void> {
+    if (!hasUserScope()) return;
     const allIds = SEED_ALERTS.map((a) => a.id);
     acknowledgeAllIds(_currentUserId, allIds);
 }
 
 export async function unacknowledgeAllAlerts(): Promise<void> {
+    if (!hasUserScope()) return;
     unacknowledgeAllIds(_currentUserId);
 }

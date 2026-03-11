@@ -73,6 +73,38 @@ const VIEW_MOCK: Record<string, IDashboardViewData> = {
     feelings: { ...MOCK_OVERVIEW, kpis: { ...MOCK_KPIS, depressionCount: 187, stressCount: 421 } },
 };
 
+// ── Ingest payload shape (Section 4 of Integration Guide) ────────────────
+export interface IIngestPayload {
+    source: string;
+    category: string;
+    value: number;
+    timestamp: string;
+}
+
+// ── Health check — GET /healthz (unauthenticated) ─────────────────────────
+export async function healthCheck(): Promise<{ status: string }> {
+    const { data } = await apiClient.get<{ status: string }>('/healthz');
+    return data;
+}
+
+// ── Hinsight summary — GET /hinsight (authenticated) ──────────────────────
+export async function fetchHinsightSummary(): Promise<unknown> {
+    const { data } = await apiClient.get('/hinsight');
+    return data;
+}
+
+// ── Data ingestion — POST /api/v1/ingest (authenticated) ──────────────────
+export async function submitIngestData(payload: IIngestPayload): Promise<unknown> {
+    const { data } = await apiClient.post('/api/v1/ingest', payload);
+    return data;
+}
+
+// ── Demo export — GET /v1/demo/export (dev fallback) ──────────────────────
+export async function fetchDemoExport(): Promise<unknown> {
+    const { data } = await apiClient.get('/v1/demo/export');
+    return data;
+}
+
 // ── Real API call with automatic fallback ──────────────────────────────────
 
 export async function fetchDashboardData(view: string): Promise<IDashboardViewData> {

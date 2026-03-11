@@ -44,7 +44,13 @@ export const authService = {
         admin_email: string;
         admin_password: string;
     }): Promise<{ tenant_id: string; admin_user_id: string; tenant_slug: string; data_region: string }> => {
-        const { data } = await apiClient.post('/auth/tenant-signup', payload);
+        // Include compatibility aliases for backend variants that still read email/password.
+        const requestPayload = {
+            ...payload,
+            email: payload.admin_email,
+            password: payload.admin_password,
+        };
+        const { data } = await apiClient.post('/auth/tenant-signup', requestPayload);
         return data;
     },
 
@@ -58,8 +64,8 @@ export const authService = {
         data_region: 'CA' | 'US';
         email: string;
         password: string;
-    }): Promise<{ user_id?: string; [key: string]: unknown }> => {
-        const { data } = await apiClient.post('/auth/user-signup', payload);
+    }): Promise<{ user_id: string; tenant_id: string; role: string }> => {
+        const { data } = await apiClient.post<{ user_id: string; tenant_id: string; role: string }>('/auth/user-signup', payload);
         return data;
     },
 };

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Building2 } from 'lucide-react';
 import { authService } from '../services/authService';
+import { setDataRegion } from '../services/apiClient';
 
 const TenantSignupPage = () => {
     const navigate = useNavigate();
@@ -29,6 +30,7 @@ const TenantSignupPage = () => {
         setError(null);
         setIsSubmitting(true);
         try {
+            setDataRegion(form.data_region);
             await authService.tenantSignup(form);
             navigate('/login', { state: { signupSuccess: true } });
         } catch (err: unknown) {
