@@ -1,3 +1,5 @@
+import type { IDashboardViewData } from '../types/dashboard.types';
+
 // Measurement 1: Contributing factor counts (suffering + at-risk)
 export const CONTRIBUTING_FACTOR_COUNTS = {
     Sleep: { suffering: 10, atRisk: 10 },
@@ -109,4 +111,109 @@ export const EMPLOYEES_WITH_CONDITIONS_DATA = [
     { condition: 'Arrythmia', confirmed: 2, atRisk: 3 },
 ];
 
-export const TOTAL_EMPLOYEES = 70;
+export let TOTAL_EMPLOYEES = 70;
+
+const FACTOR_NAME_BY_KEY = {
+    sleep: 'Sleep',
+    nutrition: 'Nutrition',
+    stress: 'Stress',
+    depression: 'Depression',
+    smoke: 'Smoke',
+    obesity: 'Obesity',
+    wellness: 'Wellness',
+    movement: 'Movement',
+} as const;
+
+const CONDITION_LABELS = [
+    'Hypertension',
+    'Chronic Kidney Disease',
+    'Cancer',
+    'Type 2 Diabetes',
+    'Type 1 Diabetes',
+    'Arrythmia',
+];
+
+export function applyDashboardDataToMock(data: IDashboardViewData): void {
+    TOTAL_EMPLOYEES = data.kpis.totalEmployees;
+
+    const kpiByFactor: Record<string, number> = {
+        Sleep: data.kpis.sleepCount,
+        Nutrition: data.kpis.nutritionCount,
+        Stress: data.kpis.stressCount,
+        Depression: data.kpis.depressionCount,
+        Smoke: data.kpis.smokeCount,
+        Obesity: data.kpis.obesityCount,
+        Wellness: data.kpis.wellnessCount,
+        Movement: data.kpis.movementCount,
+    };
+
+    for (const [factor, count] of Object.entries(kpiByFactor)) {
+        if (CONTRIBUTING_FACTOR_COUNTS[factor as keyof typeof CONTRIBUTING_FACTOR_COUNTS]) {
+            CONTRIBUTING_FACTOR_COUNTS[factor as keyof typeof CONTRIBUTING_FACTOR_COUNTS] = {
+                suffering: count,
+                atRisk: 0,
+            };
+        }
+
+        if (KPI_TILE_DATA[factor]) {
+            KPI_TILE_DATA[factor] = {
+                current: count,
+                previous: Math.max(0, count - 1),
+            };
+        }
+
+        const preExisting = PRE_EXISTING_DATA.find((row) => row.factor === factor);
+        if (preExisting) {
+            preExisting.current = count;
+            preExisting.baseline = Math.max(count, preExisting.baseline);
+        }
+
+        const severity = SEVERITY_DATA.find((row) => row.factor === factor);
+        if (severity) {
+            severity.important = Math.max(0, Math.round(count * 0.7));
+            severity.veryImportant = Math.max(0, count - severity.important);
+        }
+
+        const factorKey = factor as keyof typeof IMPROVEMENT_RATES.byFactor;
+        if (IMPROVEMENT_RATES.byFactor[factorKey]) {
+            const rateEntry = data.improvementRates.find((r) => r.factor === factor);
+            IMPROVEMENT_RATES.byFactor[factorKey] = {
+                rate: rateEntry?.rate ?? 0,
+                count,
+                baseline: Math.max(0, count - 1),
+            };
+        }
+    }
+
+    WELLBEING_OVERVIEW_DATA.splice(
+        0,
+        WELLBEING_OVERVIEW_DATA.length,
+        ...Object.entries(FACTOR_NAME_BY_KEY).map(([key, factor]) => {
+            const count = data.wellbeingOverview[key as keyof typeof FACTOR_NAME_BY_KEY] ?? 0;
+            return {
+                factor,
+                suffering: count,
+                atRisk: 0,
+            };
+        })
+    );
+
+    const conditionSummaryCounts = [...data.conditionSummary]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, CONDITION_LABELS.length);
+
+    EMPLOYEES_WITH_CONDITIONS_DATA.splice(
+        0,
+        EMPLOYEES_WITH_CONDITIONS_DATA.length,
+        ...CONDITION_LABELS.map((label, index) => {
+            const count = conditionSummaryCounts[index]?.count ?? 0;
+            const confirmed = Math.max(0, Math.round(count * 0.65));
+            const atRisk = Math.max(0, count - confirmed);
+            return {
+                condition: label,
+                confirmed,
+                atRisk,
+            };
+        })
+    );
+}

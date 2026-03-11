@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { authService } from '../services/authService';
+import { setDataRegion } from '../services/apiClient';
 
 const UserSignupPage = () => {
     const navigate = useNavigate();
@@ -27,6 +28,7 @@ const UserSignupPage = () => {
         setError(null);
         setIsSubmitting(true);
         try {
+            setDataRegion(form.data_region);
             await authService.userSignup(form);
             navigate('/login', { state: { signupSuccess: true } });
         } catch (err: unknown) {

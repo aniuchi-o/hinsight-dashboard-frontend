@@ -29,6 +29,7 @@ function authReducer(state: IAuthState, action: AuthAction): IAuthState {
             };
         case 'LOGOUT':
             setAccessToken(null);
+            setAlertsUserId('');
             return { ...initialState };
         default:
             return state;

@@ -1,5 +1,5 @@
 // Lowercase roles matching backend JWT `role` claim
-export type UserRole = 'admin' | 'executive' | 'wellness_manager' | 'program_manager';
+export type UserRole = 'admin' | 'executive' | 'wellness_manager' | 'program_manager' | 'viewer';
 
 export interface ILoginPayload {
     email: string;
@@ -33,6 +33,15 @@ export interface IJWTClaims {
  * RBAC Permissions Map — includes Alerts, Settings, Help.
  */
 export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+    viewer: [
+        'view:overview',
+        'view:lifestyle',
+        'view:nutrition_obesity',
+        'view:feelings',
+        'view:alerts',
+        'view:help',
+        'action:alerts:view',
+    ],
     executive: [
         'view:overview',
         'view:lifestyle',
