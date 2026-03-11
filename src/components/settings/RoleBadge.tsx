@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { UserRole } from '../../types/auth.types';
 
 const ROLE_STYLES: Record<UserRole, string> = {
+    viewer: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300',
     executive: 'bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand-light',
     wellness_manager: 'bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-400',
     program_manager: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
@@ -9,6 +10,7 @@ const ROLE_STYLES: Record<UserRole, string> = {
 };
 
 const ROLE_LABELS: Record<UserRole, string> = {
+    viewer: 'Viewer',
     executive: 'Executive',
     wellness_manager: 'Wellness Manager',
     program_manager: 'Program Manager',

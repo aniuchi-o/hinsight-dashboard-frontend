@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { KeyRound } from 'lucide-react';
 import { authService } from '../services/authService';
 import { useAuth } from '../context/AuthContext';
+import { setDataRegion } from '../services/apiClient';
 
 const MFAVerifyPage = () => {
     const navigate = useNavigate();
@@ -28,6 +29,7 @@ const MFAVerifyPage = () => {
         setError(null);
         setIsVerifying(true);
         try {
+            setDataRegion(pending.data_region);
             const { access_token } = await authService.login({
                 ...pending,
                 otp: code,

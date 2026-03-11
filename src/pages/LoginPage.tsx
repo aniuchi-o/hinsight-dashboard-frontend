@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Shield, Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useSettingsContext } from '../context/SettingsContext';
 import { authService } from '../services/authService';
@@ -49,6 +50,28 @@ const LoginPage = () => {
             login(response.access_token, form.tenant_slug);
             navigate(from, { replace: true });
         } catch (err: unknown) {
+            if (axios.isAxiosError(err)) {
+                const status = err.response?.status;
+                const detail = (err.response?.data as { detail?: string } | undefined)?.detail;
+                const detailLower = detail?.toLowerCase() ?? '';
+
+                if (status === 401 && detailLower.includes('mfa required')) {
+                    navigate('/mfa/verify', {
+                        replace: true,
+                        state: {
+                            email: form.email,
+                            password: form.password,
+                            tenant_slug: form.tenant_slug,
+                            data_region: form.data_region,
+                        },
+                    });
+                    return;
+                }
+
+                setError(detail ?? err.message ?? 'Login failed. Check your credentials.');
+                return;
+            }
+
             const message = err instanceof Error ? err.message : 'Login failed. Check your credentials.';
             setError(message);
         } finally {

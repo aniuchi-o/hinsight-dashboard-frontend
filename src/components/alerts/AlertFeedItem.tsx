@@ -39,6 +39,13 @@ const AlertFeedItem = ({ alert, canAcknowledge, onAcknowledge, isAcknowledging }
         onAcknowledge(alert.id);
     };
 
+    const handleViewInPage = () => {
+        if (canAcknowledge && !alert.isAcknowledged) {
+            handleAcknowledge();
+        }
+        navigate(VIEW_PATHS[alert.relatedView ?? ''] ?? '/overview');
+    };
+
     return (
         <div
             className={clsx(
@@ -95,7 +102,7 @@ const AlertFeedItem = ({ alert, canAcknowledge, onAcknowledge, isAcknowledging }
                         </span>
                         {alert.relatedView && alert.relatedView !== 'system' && (
                             <button
-                                onClick={() => navigate(VIEW_PATHS[alert.relatedView ?? ''] ?? '/overview')}
+                                onClick={handleViewInPage}
                                 className="text-[11px] text-brand dark:text-brand-light hover:underline flex items-center gap-1"
                             >
                                 View in {alert.relatedView.replace('_', ' ')}
