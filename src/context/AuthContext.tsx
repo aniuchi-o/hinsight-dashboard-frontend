@@ -1,12 +1,14 @@
 import {
     createContext, useContext, useReducer, ReactNode, useCallback, useEffect
 } from 'react';
-import { IAuthState, IAuthUser, ROLE_PERMISSIONS } from '../types/auth.types';
+import { IAuthState, IAuthUser, ROLE_PERMISSIONS, IJWTClaims } from '../types/auth.types';
+import { decodeJWT, isTokenExpired } from '../utils/jwtUtils';
+import { setAccessToken, setDataRegion } from '../services/apiClient';
+import { setAlertsUserId } from '../services/alertsService';
 
 type AuthAction =
     | { type: 'LOGIN_SUCCESS'; payload: { user: IAuthUser; accessToken: string } }
-    | { type: 'LOGOUT' }
-    | { type: 'TOKEN_REFRESHED'; payload: { accessToken: string } };
+    | { type: 'LOGOUT' };
 
 const initialState: IAuthState = {
     user: null,
@@ -26,16 +28,15 @@ function authReducer(state: IAuthState, action: AuthAction): IAuthState {
                 isLoading: false,
             };
         case 'LOGOUT':
+            setAccessToken(null);
             return { ...initialState };
-        case 'TOKEN_REFRESHED':
-            return { ...state, accessToken: action.payload.accessToken };
         default:
             return state;
     }
 }
 
 interface IAuthContext extends IAuthState {
-    login: (user: IAuthUser, accessToken: string) => void;
+    login: (accessToken: string, tenantSlug: string) => void;
     logout: () => void;
     hasPermission: (permission: string) => boolean;
 }
@@ -45,26 +46,39 @@ const AuthContext = createContext<IAuthContext | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [state, dispatch] = useReducer(authReducer, initialState);
 
-    // Listen for 401 auto-logout event from apiClient
-    useEffect(() => {
-        const handler = () => dispatch({ type: 'LOGOUT' });
-        window.addEventListener('hinsight:logout', handler);
-        return () => window.removeEventListener('hinsight:logout', handler);
-    }, []);
-
-    const login = useCallback((user: IAuthUser, accessToken: string) => {
-        const permissions = ROLE_PERMISSIONS[user.role] ?? [];
-        // Store token in memory for apiClient interceptor
-        (window as { __hinsight_token?: string }).__hinsight_token = accessToken;
-        dispatch({
-            type: 'LOGIN_SUCCESS',
-            payload: { user: { ...user, permissions }, accessToken },
-        });
-    }, []);
-
     const logout = useCallback(() => {
-        delete (window as { __hinsight_token?: string }).__hinsight_token;
         dispatch({ type: 'LOGOUT' });
+    }, []);
+
+    /**
+     * Called after a successful POST /auth/login response.
+     * Decodes the JWT to hydrate IAuthUser from claims.
+     */
+    const login = useCallback((accessToken: string, tenantSlug: string) => {
+        const claims: IJWTClaims | null = decodeJWT(accessToken);
+        if (!claims) {
+            console.error('[HINSIGHT] Failed to decode JWT — rejecting login');
+            return;
+        }
+
+        setDataRegion(claims.reg);
+        setAccessToken(accessToken);
+        setAlertsUserId(claims.sub);
+
+        const permissions = ROLE_PERMISSIONS[claims.role] ?? [];
+        const user: IAuthUser = {
+            id: claims.sub,
+            role: claims.role,
+            tenantId: claims.tid,
+            tenantSlug,
+            dataRegion: claims.reg,
+            displayName: tenantSlug,
+            permissions,
+            lastLoginAt: new Date().toISOString(),
+            sessionId: crypto.randomUUID(),
+        };
+
+        dispatch({ type: 'LOGIN_SUCCESS', payload: { user, accessToken } });
     }, []);
 
     const hasPermission = useCallback(
@@ -75,6 +89,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         [state.user]
     );
+
+    // Listen for 401 events from the API interceptor
+    useEffect(() => {
+        const handleUnauthorized = () => logout();
+        window.addEventListener('auth:unauthorized', handleUnauthorized);
+        return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    }, [logout]);
+
+    // Proactive token expiry check — every 30 seconds
+    useEffect(() => {
+        if (!state.accessToken) return;
+        const interval = setInterval(() => {
+            if (isTokenExpired(state.accessToken!)) {
+                logout();
+            }
+        }, 30_000);
+        return () => clearInterval(interval);
+    }, [state.accessToken, logout]);
 
     return (
         <AuthContext.Provider value={{ ...state, login, logout, hasPermission }}>

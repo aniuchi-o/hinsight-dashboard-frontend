@@ -1,6 +1,8 @@
+import { apiClient, getAccessToken } from './apiClient';
+import { transformInsightsResponse } from './insightsTransformer';
 import { IDashboardViewData, IKPIMetrics, IContributingFactorCounts } from '../types/dashboard.types';
 
-// ── Mock data for Phase 1 (no backend yet) ────────────────────────────────
+// ── Mock fallback data (used when insights API is unavailable) ─────────────
 
 const MOCK_KPIS: IKPIMetrics = {
     totalEmployees: 1247,
@@ -64,30 +66,26 @@ const MOCK_OVERVIEW: IDashboardViewData = {
     lastUpdatedAt: new Date().toISOString(),
 };
 
-const MOCK_LIFESTYLE: IDashboardViewData = {
-    ...MOCK_OVERVIEW,
-    kpis: { ...MOCK_KPIS, stressCount: 421, sleepCount: 312, movementCount: 298 },
-};
-
-const MOCK_NUTRITION: IDashboardViewData = {
-    ...MOCK_OVERVIEW,
-    kpis: { ...MOCK_KPIS, nutritionCount: 278, obesityCount: 356 },
-};
-
-const MOCK_FEELINGS: IDashboardViewData = {
-    ...MOCK_OVERVIEW,
-    kpis: { ...MOCK_KPIS, depressionCount: 187, stressCount: 421 },
-};
-
-const VIEW_DATA: Record<string, IDashboardViewData> = {
+const VIEW_MOCK: Record<string, IDashboardViewData> = {
     overview: MOCK_OVERVIEW,
-    lifestyle: MOCK_LIFESTYLE,
-    'nutrition-obesity': MOCK_NUTRITION,
-    feelings: MOCK_FEELINGS,
+    lifestyle: { ...MOCK_OVERVIEW, kpis: { ...MOCK_KPIS, stressCount: 421, sleepCount: 312, movementCount: 298 } },
+    'nutrition-obesity': { ...MOCK_OVERVIEW, kpis: { ...MOCK_KPIS, nutritionCount: 278, obesityCount: 356 } },
+    feelings: { ...MOCK_OVERVIEW, kpis: { ...MOCK_KPIS, depressionCount: 187, stressCount: 421 } },
 };
+
+// ── Real API call with automatic fallback ──────────────────────────────────
 
 export async function fetchDashboardData(view: string): Promise<IDashboardViewData> {
-    // Simulate network latency
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    return VIEW_DATA[view] ?? MOCK_OVERVIEW;
+    // Only attempt the real API when we have a valid token
+    if (getAccessToken()) {
+        try {
+            const { data } = await apiClient.get('/api/v1/insights', {
+                params: { view },
+            });
+            return transformInsightsResponse(data);
+        } catch {
+            // 403 / network error → fall through to mock data
+        }
+    }
+    return VIEW_MOCK[view] ?? MOCK_OVERVIEW;
 }

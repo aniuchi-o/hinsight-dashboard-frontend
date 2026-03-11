@@ -1,9 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Shield, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSettingsContext } from '../context/SettingsContext';
-import { IAuthUser, ROLE_PERMISSIONS } from '../types/auth.types';
+import { authService } from '../services/authService';
+import { setDataRegion } from '../services/apiClient';
+
+const DEMO_CREDENTIALS = {
+    email: 'admin@demo.com',
+    password: 'DemoPass123!',
+    tenant_slug: 'demo',
+    data_region: 'CA' as const,
+};
 
 const VIEW_ROUTE_MAP: Record<string, string> = {
     overview: '/overview',
@@ -12,34 +20,43 @@ const VIEW_ROUTE_MAP: Record<string, string> = {
     feelings: '/feelings',
 };
 
-// Mock wellness manager user for Phase 1 demo
-const MOCK_EXECUTIVE: IAuthUser = {
-    id: 'usr-wm-001',
-    role: 'WELLNESS_MANAGER',
-    tenantId: 'tenant-ca-001',
-    displayName: 'Alex Morgan',
-    permissions: ROLE_PERMISSIONS['WELLNESS_MANAGER'],
-    lastLoginAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    sessionId: 'sess-abc123-def456',
-};
-
 const LoginPage = () => {
     const { login } = useAuth();
     const { defaultView } = useSettingsContext();
     const navigate = useNavigate();
+    const location = useLocation();
+    const from = (location.state as { from?: { pathname: string } })?.from?.pathname
+        ?? VIEW_ROUTE_MAP[defaultView] ?? '/overview';
+
+    const [form, setForm] = useState({
+        email: '',
+        password: '',
+        tenant_slug: '',
+        data_region: 'CA' as 'CA' | 'US',
+    });
+    const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
-    const [email, setEmail] = useState('exec@nytia.com');
-    const [password, setPassword] = useState('••••••••');
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         setIsLoading(true);
-        // Simulate auth delay
-        await new Promise((r) => setTimeout(r, 800));
-        login(MOCK_EXECUTIVE, 'mock-jwt-token-phase1');
-        navigate(VIEW_ROUTE_MAP[defaultView] ?? '/overview', { replace: true });
+        try {
+            // Set region before the login call so the interceptor sends the right header
+            setDataRegion(form.data_region);
+            const response = await authService.login(form);
+            login(response.access_token, form.tenant_slug);
+            navigate(from, { replace: true });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Login failed. Check your credentials.';
+            setError(message);
+        } finally {
+            setIsLoading(false);
+        }
     };
+
+    const fillDemoCredentials = () => setForm(DEMO_CREDENTIALS);
 
     return (
         <div className="min-h-screen flex items-center justify-center
@@ -61,25 +78,28 @@ const LoginPage = () => {
                         </div>
                     </div>
 
-                    <form onSubmit={handleLogin} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        {/* Email */}
                         <div>
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Email address
                             </label>
                             <input
                                 type="email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                value={form.email}
+                                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                                 className="w-full px-3 py-2.5 text-sm rounded-lg
                            border border-gray-200 dark:border-gray-600
                            bg-gray-50 dark:bg-surface-dark
                            text-gray-800 dark:text-gray-200
                            focus:outline-none focus:ring-2 focus:ring-brand/50"
+                                placeholder="you@company.com"
                                 autoComplete="email"
                                 required
                             />
                         </div>
 
+                        {/* Password */}
                         <div>
                             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                                 Password
@@ -87,13 +107,14 @@ const LoginPage = () => {
                             <div className="relative">
                                 <input
                                     type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
+                                    value={form.password}
+                                    onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
                                     className="w-full px-3 py-2.5 pr-10 text-sm rounded-lg
                              border border-gray-200 dark:border-gray-600
                              bg-gray-50 dark:bg-surface-dark
                              text-gray-800 dark:text-gray-200
                              focus:outline-none focus:ring-2 focus:ring-brand/50"
+                                    placeholder="••••••••"
                                     autoComplete="current-password"
                                     required
                                 />
@@ -107,9 +128,56 @@ const LoginPage = () => {
                             </div>
                         </div>
 
+                        {/* Tenant Slug */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                Organisation ID (tenant slug)
+                            </label>
+                            <input
+                                type="text"
+                                value={form.tenant_slug}
+                                onChange={(e) => setForm((p) => ({ ...p, tenant_slug: e.target.value }))}
+                                className="w-full px-3 py-2.5 text-sm rounded-lg
+                           border border-gray-200 dark:border-gray-600
+                           bg-gray-50 dark:bg-surface-dark
+                           text-gray-800 dark:text-gray-200
+                           focus:outline-none focus:ring-2 focus:ring-brand/50"
+                                placeholder="your-org-slug"
+                                autoComplete="organization"
+                                required
+                            />
+                        </div>
+
+                        {/* Data Region */}
+                        <div>
+                            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                                Data region
+                            </label>
+                            <select
+                                value={form.data_region}
+                                onChange={(e) => setForm((p) => ({ ...p, data_region: e.target.value as 'CA' | 'US' }))}
+                                className="w-full px-3 py-2.5 text-sm rounded-lg
+                           border border-gray-200 dark:border-gray-600
+                           bg-gray-50 dark:bg-surface-dark
+                           text-gray-800 dark:text-gray-200
+                           focus:outline-none focus:ring-2 focus:ring-brand/50"
+                            >
+                                <option value="CA">Canada (PHIPA compliant)</option>
+                                <option value="US">United States (HIPAA compliant)</option>
+                            </select>
+                        </div>
+
+                        {/* Error */}
+                        {error && (
+                            <p className="text-xs text-rose-500 bg-rose-50 dark:bg-rose-900/20 rounded-lg px-3 py-2">
+                                {error}
+                            </p>
+                        )}
+
+                        {/* Submit */}
                         <button
                             type="submit"
-                            disabled={isLoading}
+                            disabled={isLoading || !form.email || !form.password || !form.tenant_slug}
                             className="w-full py-2.5 px-4 bg-brand hover:bg-brand-dark
                          text-white font-semibold text-sm rounded-lg
                          transition-colors duration-200
@@ -127,9 +195,26 @@ const LoginPage = () => {
                         </button>
                     </form>
 
-                    <p className="text-center text-[11px] text-gray-400 dark:text-gray-500 mt-6">
-                        Phase 1 demo — click Sign in to proceed as Executive user.
-                        <br />All data shown is synthetic and contains no PHI.
+                    {/* Demo credentials */}
+                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center mb-2">
+                            Development testing
+                        </p>
+                        <button
+                            onClick={fillDemoCredentials}
+                            className="w-full py-2 border border-brand/30 text-brand dark:text-brand-light
+                                       rounded-lg text-xs hover:bg-brand/5 transition-colors"
+                        >
+                            Use demo credentials
+                        </button>
+                    </div>
+
+                    {/* Signup links */}
+                    <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-4">
+                        New organisation?{' '}
+                        <Link to="/signup/tenant" className="text-brand hover:underline">Register here</Link>
+                        {' · '}
+                        <Link to="/signup/user" className="text-brand hover:underline">Create user account</Link>
                     </p>
                 </div>
 
